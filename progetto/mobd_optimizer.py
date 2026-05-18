@@ -40,6 +40,8 @@ import os
 import sys
 import time
 import argparse
+import tempfile
+import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── Problem constants ──────────────────────────────────────────────────────────
@@ -53,10 +55,18 @@ STATIONS = np.array([[0., 0.], [100., 100.], [-100., 100.],
                      [-100., -100.], [100., -100.]], dtype=np.float64)
 
 # ── File paths ─────────────────────────────────────────────────────────────────
-_DIR      = os.path.dirname(os.path.abspath(__file__))
-SIMULATOR = os.path.join(_DIR, "linux", "mobd")
-OUTPUT    = os.path.join(_DIR, "x.txt")
-_SHM      = "/dev/shm"          # RAM disk for simulator I/O
+_DIR = os.path.dirname(os.path.abspath(__file__))
+
+_PLATFORM = platform.system()
+if _PLATFORM == "Windows":
+    SIMULATOR = os.path.join(_DIR, "win", "mobd.exe")
+elif _PLATFORM == "Darwin":
+    SIMULATOR = os.path.join(_DIR, "macos", "mobd")
+else:
+    SIMULATOR = os.path.join(_DIR, "linux", "mobd")
+
+OUTPUT = os.path.join(_DIR, "x.txt")
+_SHM   = "/dev/shm" if _PLATFORM == "Linux" else tempfile.gettempdir()
 
 N_WORKERS = max(1, os.cpu_count() or 4)   # parallel threads for f4 perturbations
 
