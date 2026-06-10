@@ -1,0 +1,1392 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Encoding & font ──────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{lmodern}
+
+% ─── Layout ───────────────────────────────────────────────────────────────────
+\usepackage[top=2.5cm,bottom=2.5cm,left=3cm,right=3cm,headheight=15pt]{geometry}
+\usepackage{setspace}
+\setstretch{1.15}
+\usepackage{parskip}
+
+% ─── Math ─────────────────────────────────────────────────────────────────────
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+
+% ─── Graphics & color ─────────────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage[dvipsnames,table]{xcolor}
+\definecolor{codeblue}{HTML}{2B547E}
+\definecolor{codegray}{HTML}{F5F5F5}
+\definecolor{mygreen}{HTML}{1A6B3A}
+\definecolor{myred}{HTML}{8B1A1A}
+\definecolor{mypurple}{HTML}{4B0082}
+\definecolor{myteal}{HTML}{006666}
+
+% ─── Code listing ─────────────────────────────────────────────────────────────
+\usepackage{listings}
+\lstdefinestyle{python}{
+  language=Python,
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{mygreen}\itshape,
+  stringstyle=\color{myred},
+  numberstyle=\tiny\color{gray},
+  numbers=left,
+  numbersep=6pt,
+  stepnumber=1,
+  showstringspaces=false,
+  breaklines=true,
+  frame=single,
+  framerule=0.5pt,
+  rulecolor=\color{gray!50},
+  xleftmargin=1.5em,
+  framexleftmargin=1.5em,
+  tabsize=4,
+  captionpos=b,
+  morekeywords={True,False,None},
+}
+\lstset{style=python}
+
+% ─── Boxes ────────────────────────────────────────────────────────────────────
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+\newtcolorbox{definbox}[2][]{
+  enhanced, breakable,
+  colback=blue!5!white, colframe=blue!60!black,
+  title=\textbf{#2}, fonttitle=\bfseries\small,
+  #1
+}
+\newtcolorbox{thmbox}[2][]{
+  enhanced, breakable,
+  colback=green!5!white, colframe=mygreen,
+  title=\textbf{#2}, fonttitle=\bfseries\small,
+  #1
+}
+\newtcolorbox{warnbox}[2][]{
+  enhanced, breakable,
+  colback=orange!10!white, colframe=orange!80!black,
+  title=\textbf{#2}, fonttitle=\bfseries\small,
+  #1
+}
+\newtcolorbox{codebox}[2][]{
+  enhanced, breakable,
+  colback=codegray, colframe=gray!50,
+  title=\texttt{#2}, fonttitle=\ttfamily\small\bfseries,
+  #1
+}
+
+% ─── Hyperlinks ───────────────────────────────────────────────────────────────
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=codeblue, urlcolor=myteal, citecolor=mygreen}
+
+% ─── Headers & footer ─────────────────────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textit{MOBD – Documentazione di sviluppo}}
+\rhead{\small\textit{Metodi di Ottimizzazione per Big Data}}
+\cfoot{\thepage}
+
+% ─── Misc ─────────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{microtype}
+
+% ─── Theorem environments ─────────────────────────────────────────────────────
+\newtheorem{theorem}{Teorema}[section]
+\newtheorem{proposition}[theorem]{Proposizione}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollario}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definizione}
+\newtheorem{remark}[theorem]{Osservazione}
+
+% ─── Custom commands ──────────────────────────────────────────────────────────
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+\newcommand{\inner}[2]{\langle #1,\, #2\rangle}
+\newcommand{\grad}{\nabla}
+\newcommand{\Hess}{\nabla^2}
+\newcommand{\T}{^{\top}}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Huge\bfseries Mars Operations: Base Deployment\\[0.5em]
+  \large Documentazione completa di sviluppo\par}
+  \vspace{1.5cm}
+  {\large Corso: \textit{Metodi di Ottimizzazione per Big Data}\\
+  Prof.\ Andrea Cristofari\\
+  Università di Roma ``Tor Vergata'' — A.A.\ 2025/2026\par}
+  \vspace{2cm}
+  \rule{0.8\textwidth}{0.4pt}\\[0.5em]
+  {\small
+  Questo documento descrive in dettaglio la formulazione del problema MOBD,
+  il fondamento teorico dell'algoritmo scelto (Randomized Block Coordinate Descent
+  nella variante Gauss-Seidel con stepsize decrescente), le scelte progettuali adottate,
+  i limiti incontrati e le soluzioni implementate.\\
+  Ogni blocco del codice \texttt{mobd\_optimizer.py} è commentato riga per riga.}\\[0.5em]
+  \rule{0.8\textwidth}{0.4pt}
+  \vfill
+  {\small\today}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Descrizione del problema}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Contesto e obiettivo}
+
+Il progetto \textit{Mars Operations: Base Deployment} (MOBD) simula il posizionamento ottimale
+di $m = 1000$ moduli operativi $x^1, \ldots, x^m$ su una mappa bidimensionale del pianeta Marte.
+Nell'area è già presente una postazione fissa $z^0 = (0,0)$ (centro di controllo) e quattro stazioni:
+\[
+  z^1 = (100,100),\quad z^2 = (-100,100),\quad z^3 = (-100,-100),\quad z^4 = (100,-100).
+\]
+Ogni modulo $x^i \in \R^2$ ha coordinate $(x^i_1, x^i_2)$.
+Il vettore delle variabili di decisione è
+\[
+  x = \bigl(x^1_1,\, x^1_2,\, x^2_1,\, x^2_2,\, \ldots,\, x^{1000}_1,\, x^{1000}_2\bigr)\T \in \R^{2000}.
+\]
+Si vuole \textbf{minimizzare} la funzione di costo totale:
+\[
+  \min_{x \in \R^{2000}} \; f(x) = f_1(x) + f_2(x) + f_3(x) + f_4(x).
+\]
+
+\subsection{I quattro componenti di costo}
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{$f_1$ — Dispersione della rete (coesione mesh)}
+
+
+\[
+  f_1(x) = 0.1 \sum_{i < j} \Bigl(1 - e^{-\|x^i - x^j\|^2}\Bigr)
+\]
+Misura la \emph{perdita di coesione} della rete mesh.
+Per ogni coppia $(i,j)$, il termine $1 - e^{-\|x^i-x^j\|^2}$ è vicino a 0 quando i moduli sono
+vicini, e tende a 1 quando si allontanano. Si sommano tutte le $\binom{1000}{2} = 499\,500$ coppie.
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{$f_2$ — Distanza dalle stazioni fisse}
+
+
+\[
+  f_2(x) = \frac{1}{m} \sum_{i=1}^{m} \sum_{q=0}^{4} \|x^i - z^q\|^2
+\]
+Penalità quadratica sull'allontanamento dalle $Q=5$ stazioni fisse.
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{$f_3$ — Deviazione dalla distanza operativa ideale}
+
+
+\[
+  f_3(x) = 1000 \sum_{i=1}^{m}
+  \left(\frac{\log(1 + \|x^i - s^i\|^2)}{\log(1+r^2)} - 1\right)^2,
+  \quad r = 100
+\]
+dove $s^i = \bigl((-1)^i \cdot i \cdot 0.2,\; (-1)^i \cdot i \cdot 0.2\bigr)$ è il punto di
+riferimento operativo del modulo $i$.
+La funzione è minimizzata (vale 0) esattamente quando $\|x^i - s^i\| = r = 100$ per ogni $i$.
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{$f_4$ — Costo ambientale black-box}
+
+
+$f_4$ modella fenomeni non ideali (ombreggiamento radio, micro-fratture del regolite, polvere,
+interferenze elettromagnetiche, congestione locale).
+\textbf{Non ha espressione analitica nota}: viene valutata esclusivamente tramite il simulatore
+esterno \texttt{mobd} con l'opzione \texttt{-b}.
+Il simulatore è deterministico e richiede in input il file \texttt{x.txt} (2000 valori reali,
+un valore per riga).
+
+
+\noindent §§BOXEND§§
+
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Fondamento teorico dell'algoritmo}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Ottimizzazione non vincolata e condizioni di ottimalità}
+
+Il problema è un'ottimizzazione \emph{non vincolata} in $\R^{n}$ con $n = 2000$:
+\[
+  \min_{x \in \R^n} f(x).
+\]
+
+
+
+\noindent §§BOXSTART§thmbox§§
+
+\textbf{Condizioni necessarie del primo ordine}
+
+
+Se $x^*$ è un minimo locale di $f$ e $f$ è differenziabile in $x^*$, allora:
+\[
+  \grad f(x^*) = 0.
+\]
+Un punto che soddisfa questa condizione è detto \emph{punto stazionario}.
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§thmbox§§
+
+\textbf{Condizioni necessarie del secondo ordine}
+
+
+Se $x^*$ è un minimo locale di $f$ e $f$ è due volte differenziabile in $x^*$, allora:
+\[
+  \grad f(x^*) = 0 \quad \text{e} \quad \Hess f(x^*) \succeq 0.
+\]
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§thmbox§§
+
+\textbf{Condizioni sufficienti del secondo ordine}
+
+
+Se $\grad f(x^*) = 0$ e $\Hess f(x^*) \succ 0$, allora $x^*$ è un minimo locale stretto.
+
+
+\noindent §§BOXEND§§
+
+
+
+\subsection{Metodi a discesa: direzioni gradient-related}
+
+Un metodo iterativo $x_{k+1} = x_k + \alpha_k d_k$ garantisce la discesa se la direzione
+$d_k$ è \emph{gradient-related}, cioè soddisfa:
+\[
+  \grad f(x_k)\T d_k \leq -c_1 \|\grad f(x_k)\|^2, \qquad
+  \|d_k\| \leq c_2 \|\grad f(x_k)\|,
+\]
+per costanti $c_1, c_2 > 0$.
+La direzione del \textbf{gradiente negativo} $d_k = -\grad f(x_k)$ soddisfa entrambe
+le condizioni con $c_1 = c_2 = 1$.
+
+\subsection{Block Coordinate Descent (BCD)}
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{Partizionamento in blocchi}
+
+
+Si partiziona il vettore $x \in \R^n$ in $m$ blocchi:
+\[
+  x = (x^1, x^2, \ldots, x^m), \quad x^i \in \R^{n_i}, \quad \sum_{i=1}^m n_i = n.
+\]
+Nel nostro caso: $m = 1000$ blocchi, $n_i = 2$ per ogni $i$ (le coordinate 2D del modulo $i$),
+$n = 2000$.
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{BCD Gauss-Seidel (variante ciclica)}
+
+
+Ad ogni iterazione, si aggiorna un solo blocco $i$ alla volta, tenendo fissi tutti gli altri.
+L'aggiornamento del blocco $i$ all'epoca $k$ è:
+\[
+  x^i_{k+1} = x^i_k - \alpha_k \grad_{x^i} f(x_k),
+\]
+dove $\grad_{x^i} f$ è il \emph{gradiente parziale} rispetto al blocco $i$.
+Nella variante \textbf{Gauss-Seidel}, i blocchi già aggiornati nell'epoca corrente vengono
+usati immediatamente per il calcolo dei gradienti successivi (in contrast con la variante
+Jacobi che usa sempre le posizioni all'inizio dell'epoca).
+
+
+\noindent §§BOXEND§§
+
+
+
+\subsection{Randomized BCD (RBCD) — Gauss-Seidel con permutazione casuale}
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{RBCD Gauss-Seidel}
+
+
+Ad ogni epoca $k$:
+\begin{enumerate}
+  \item Si genera una permutazione casuale $\sigma_k$ di $\{1, \ldots, m\}$.
+  \item Si aggiornano i blocchi nell'ordine $\sigma_k(1), \sigma_k(2), \ldots, \sigma_k(m)$.
+  \item Ogni aggiornamento usa le posizioni \textbf{più recenti} disponibili.
+\end{enumerate}
+L'uso di una permutazione casuale (invece di un ordine fisso) migliora le proprietà di
+convergenza e riduce il rischio di comportamenti patologici legati alla struttura del problema.
+
+
+\noindent §§BOXEND§§
+
+
+
+\subsection{Stepsize decrescente (Diminishing Stepsize)}
+
+
+
+\noindent §§BOXSTART§definbox§§
+
+\textbf{Schema di stepsize decrescente}
+
+
+Lo stepsize al passo $k$ è definito come:
+\[
+  \alpha_k = \frac{\alpha_0}{(1 + \beta \cdot k)^\gamma},
+\]
+dove $\alpha_0 > 0$ è lo stepsize iniziale, $\beta > 0$ controlla la velocità di decrescita,
+e $\gamma \in (0,1]$ è l'esponente di decrescita.
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§thmbox§§
+
+\textbf{Condizioni sufficienti per la convergenza (Teorema di convergenza)}
+
+
+Una sequenza di stepsize $\{\alpha_k\}$ garantisce la convergenza se:
+\[
+  \lim_{k \to \infty} \alpha_k = 0 \qquad \text{e} \qquad \sum_{k=0}^{\infty} \alpha_k = +\infty.
+\]
+Per il nostro schema $\alpha_k = \alpha_0 / (1 + \beta k)^\gamma$:
+\begin{itemize}
+  \item $\lim_{k\to\infty} \alpha_k = 0$ è verificata per ogni $\gamma > 0$.
+  \item $\sum_k \alpha_k = +\infty$ è verificata se e solo se $\gamma \leq 1$.
+\end{itemize}
+Con $\gamma = 0.6 \leq 1$, entrambe le condizioni sono soddisfatte.
+
+
+\noindent §§BOXEND§§
+
+
+
+
+
+\noindent §§BOXSTART§thmbox§§
+
+\textbf{Teorema di convergenza RBCD — Gauss-Seidel (da slide del corso)}
+
+
+Sia $f : \R^n \to \R$ continuamente differenziabile con gradiente Lipschitz.
+Sia $\{x_k\}$ la sequenza generata dall'algoritmo RBCD Gauss-Seidel con stepsize decrescente
+che soddisfa $\alpha_k \to 0$ e $\sum_k \alpha_k = +\infty$.
+Allora ogni punto di accumulazione della sequenza $\{x_k\}$ è un \textbf{punto stazionario}
+di $f$, cioè soddisfa $\grad f(x^*) = 0$.
+
+
+\noindent §§BOXEND§§
+
+
+
+\begin{remark}
+Nel caso non convesso, la complessità per ottenere $\|\grad f(x_k)\| \leq \varepsilon$ è
+$O(\varepsilon^{-2})$ iterazioni, analoga a quella del metodo del gradiente classico.
+\end{remark}
+
+\subsection{Differenze finite in avanti per il gradiente di $f_4$}
+
+Poiché $f_4$ è una black-box senza espressione analitica, si approssima il suo gradiente
+parziale tramite \textbf{differenze finite in avanti} (forward finite differences):
+\[
+  \frac{\partial f_4}{\partial x^i_j}(x) \approx
+  \frac{f_4(x + H \cdot e_{2i+j}) - f_4(x)}{H},
+  \quad j \in \{0,1\},
+\]
+dove $H > 0$ è il passo di perturbazione (nel codice $H = 10^{-4}$) ed $e_k$ è il $k$-esimo
+vettore della base canonica di $\R^{2000}$.
+
+Per $m = 1000$ moduli con 2 coordinate ciascuno, occorrono \textbf{$2m = 2000$ chiamate al
+simulatore} per epoca (più 1 per il valore base $f_4(x)$).
+
+
+
+\noindent §§BOXSTART§warnbox§§
+
+\textbf{Scelta di $H$}
+
+
+Un valore di $H$ troppo grande introduce errore di troncamento, uno troppo piccolo causa
+cancellazione numerica. Il valore $H = 10^{-4}$ rappresenta un buon compromesso per le scale
+del problema (coordinate nell'ordine di $10^1$–$10^2$ km).
+
+
+\noindent §§BOXEND§§
+
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Limiti iniziali e soluzioni adottate}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Problema 1: costo computazionale di $f_4$}
+
+
+
+\noindent §§BOXSTART§warnbox§§
+
+\textbf{Limite}
+
+
+Ogni valutazione del simulatore richiede circa 5 secondi.
+Con 2000 chiamate per epoca in modo sequenziale:
+$2000 \times 5\,\text{s} \approx 2.78\,\text{ore per epoca}$.
+Con 20 epoche: $\approx 55.5$ ore. Assolutamente inattuabile.
+
+
+\noindent §§BOXEND§§
+
+
+
+\textbf{Soluzione: parallelizzazione con \texttt{ThreadPoolExecutor}.}
+
+Le 2000 perturbazioni sono indipendenti (ogni perturbazione riguarda un diverso indice del vettore
+$x$, tenendo fissi tutti gli altri). Si possono quindi eseguire \emph{in parallelo} su più thread.
+Con $N$ workers, il tempo si riduce a $\lceil 2000/N \rceil \times 5\,\text{s}$.
+Su una macchina con 32 CPU: $\lceil 2000/32 \rceil \times 5\,\text{s} = 63 \times 5 = 315\,\text{s}
+\approx 5.25\,\text{min/epoca}$.
+
+\subsection{Problema 2: coerenza della base per le differenze finite}
+
+
+
+\noindent §§BOXSTART§warnbox§§
+
+\textbf{Limite}
+
+
+Nella variante Gauss-Seidel, i blocchi vengono aggiornati in sequenza durante un'epoca.
+Se si calcolasse il gradiente di $f_4$ \emph{on-the-fly} (mentre $x$ cambia),
+il valore base $f_4(x)$ usato nelle differenze finite sarebbe inconsistente con il valore
+di $x$ in quel momento.
+
+
+\noindent §§BOXEND§§
+
+
+
+\textbf{Soluzione: strategia ``stale-base''.}
+
+All'inizio di ogni epoca si scatta uno \emph{snapshot} $\hat{x}$ dello stato corrente e si
+calcola $\hat{f}_4 = f_4(\hat{x})$. Tutte le 2000 perturbazioni usano la stessa base $\hat{x}$,
+garantendo che il denominatore delle differenze finite sia sempre il medesimo punto di partenza.
+Questo introduce una leggera staleness del gradiente di $f_4$ rispetto allo stato $x$ a fine epoca,
+ma è accettabile poiché lo stepsize è piccolo.
+
+\subsection{Problema 3: inizializzazione e trappole locali}
+
+
+
+\noindent §§BOXSTART§warnbox§§
+
+\textbf{Limite}
+
+
+Un'inizializzazione casuale (ad esempio $x = 0$ o posizioni uniformi) porta tipicamente a
+valori elevati di $f_3$, il che crea un gradiente dominante che può portare l'algoritmo
+lontano da buone soluzioni per i componenti $f_1, f_2, f_4$.
+
+
+\noindent §§BOXEND§§
+
+
+
+\textbf{Soluzione: warm start con $f_3 = 0$ per costruzione.}
+
+Si costruisce un'inizializzazione in cui ogni modulo è posizionato esattamente a distanza $r = 100$
+dal suo punto di riferimento $s^i$, in modo che $f_3 = 0$ al punto iniziale.
+La costruzione è:
+\[
+  x^i_0 = s^i + r \cdot \frac{-s^i}{\|s^i\|},
+\]
+cioè si parte da $s^i$ e ci si sposta di $r$ nella direzione opposta a $s^i$ (verso l'origine).
+Si verifica che $\|x^i_0 - s^i\| = r$ quindi $\phi_i = 0$ e $f_3 = 0$.
+
+\subsection{Problema 4: I/O intensivo su disco}
+
+
+
+\noindent §§BOXSTART§warnbox§§
+
+\textbf{Limite}
+
+
+Ogni chiamata al simulatore richiede di scrivere un file da 2000 righe su disco.
+Con 2000+ scritture per epoca, l'I/O su disco potrebbe diventare collo di bottiglia.
+
+
+\noindent §§BOXEND§§
+
+
+
+\textbf{Soluzione: RAM disk (\texttt{/dev/shm}).}
+
+Tutti i file temporanei vengono scritti su \texttt{/dev/shm}, che è un filesystem in memoria RAM
+su Linux. Le scritture sono ordini di grandezza più veloci rispetto al disco fisico.
+
+\subsection{Problema 5: gradiente di $f_1$ di complessità $O(m^2)$}
+
+
+
+\noindent §§BOXSTART§warnbox§§
+
+\textbf{Limite}
+
+
+Il gradiente di $f_1$ richiede la somma su tutti gli $m-1 = 999$ moduli per ogni blocco $i$.
+Con $m = 1000$ blocchi per epoca, la complessità totale è $O(m^2)$ per $f_1$.
+
+
+\noindent §§BOXEND§§
+
+
+
+\textbf{Soluzione: calcolo vettorizzato con NumPy.}
+
+Usando operazioni NumPy (broadcasting e \texttt{einsum}), il calcolo è eseguito in C sotto
+il cofano, evitando cicli Python espliciti. Questo riduce drasticamente i tempi pur mantenendo
+complessità $O(m^2)$.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Struttura del codice: panoramica}
+% ══════════════════════════════════════════════════════════════════════════════
+
+Il file principale è \texttt{mobd\_optimizer.py} (393 righe).
+La struttura logica è la seguente:
+
+\begin{enumerate}
+  \item \textbf{Costanti del problema} (righe 45–61): $m$, $r$, $H$, stazioni fisse.
+  \item \textbf{Interfaccia simulatore} (righe 64–125): scrittura file, chiamata \texttt{mobd},
+        calcolo parallelo delle 2000 perturbazioni.
+  \item \textbf{Funzioni di costo analitiche} (righe 128–153): $f_1$, $f_2$, $f_3$.
+  \item \textbf{Gradienti parziali analitici} (righe 156–179): $\grad_{x^i} f_1$,
+        $\grad_{x^i} f_2$, $\grad_{x^i} f_3$.
+  \item \textbf{Warm start} (righe 182–201): inizializzazione con $f_3 = 0$.
+  \item \textbf{Main loop RBCD} (righe 204–312): algoritmo principale.
+  \item \textbf{CLI e argomenti} (righe 315–392): parsing argomenti, modalità fast/full/both.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Analisi riga per riga del codice}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Import e costanti globali}
+
+\begin{lstlisting}[language=Python]
+#!/usr/bin/env python3
+"""
+Mars Operations: Base Deployment (MOBD) - Optimizer
+Randomized Block Coordinate Descent (RBCD), Gauss-Seidel variant.
+...
+"""
+\end{lstlisting}
+
+§§CAP§Righe 1–61 — Header, import e costanti§§
+
+
+
+\textbf{Riga 1:} Shebang Unix — permette di eseguire lo script direttamente da terminale
+come \texttt{./mobd\_optimizer.py} senza invocare esplicitamente Python.
+
+\textbf{Righe 2–35:} Docstring del modulo. Descrive il problema, l'algoritmo, la strategia
+di parallelizzazione e il checkpointing. Questa è la documentazione pubblica del modulo,
+utile per capire il progetto senza leggere il codice.
+
+\begin{lstlisting}[language=Python]
+import numpy as np
+import subprocess
+import os
+import sys
+import time
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+\end{lstlisting}
+
+§§CAP§Righe 37–43 — Import delle librerie§§
+
+
+
+\begin{itemize}[nosep]
+  \item \texttt{numpy}: algebra lineare vettorizzata (array, exp, einsum, ecc.).
+  \item \texttt{subprocess}: per invocare il simulatore \texttt{mobd} come processo esterno.
+  \item \texttt{os}: per operazioni sul filesystem (path, cpu\_count).
+  \item \texttt{sys}: accesso agli argomenti della riga di comando (usato implicitamente).
+  \item \texttt{time}: misurazione del tempo di esecuzione per ogni epoca.
+  \item \texttt{argparse}: parsing degli argomenti CLI (\texttt{--mode}, \texttt{--alpha0}, ecc.).
+  \item \texttt{ThreadPoolExecutor, as\_completed}: pool di thread per eseguire le 2000
+        perturbazioni di $f_4$ in parallelo.
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+M       = 1000
+R       = 100.0
+H       = 1e-4          # finite-difference step per df4/dx
+LOG1R2  = np.log(1.0 + R * R)
+
+STATIONS = np.array([[0., 0.], [100., 100.], [-100., 100.],
+                     [-100., -100.], [100., -100.]], dtype=np.float64)
+
+_DIR      = os.path.dirname(os.path.abspath(__file__))
+SIMULATOR = os.path.join(_DIR, "linux", "mobd")
+OUTPUT    = os.path.join(_DIR, "x.txt")
+_SHM      = "/dev/shm"
+
+N_WORKERS = max(1, os.cpu_count() or 4)
+\end{lstlisting}
+
+§§CAP§Righe 45–61 — Costanti del problema§§
+
+
+
+\begin{itemize}[nosep]
+  \item \texttt{M = 1000}: numero di moduli operativi.
+  \item \texttt{R = 100.0}: distanza operativa ideale (in km). È il valore $r$ della traccia.
+  \item \texttt{H = 1e-4}: passo per le differenze finite di $f_4$.
+        Valore scelto come compromesso tra errore di troncamento e cancellazione numerica.
+  \item \texttt{LOG1R2 = log(1 + 100²) = log(10001)}: costante calcolata una volta sola
+        (invece di ricalcolarla $m$ volte), usata in $f_3$ e nel suo gradiente.
+  \item \texttt{STATIONS}: array $(5 \times 2)$ delle stazioni fisse.
+        \textbf{Nota chiave}: la somma vettoriale delle stazioni è $(0,0)$:
+        $z^0 + z^1 + z^2 + z^3 + z^4 = (0,0)$.
+        Questo semplifica il calcolo di $\grad_{x^i} f_2$ come mostrato più avanti.
+  \item \texttt{\_DIR}: directory contenente lo script, usata per costruire percorsi assoluti.
+  \item \texttt{SIMULATOR}: percorso del binario del simulatore (dipende dal SO; qui Linux).
+  \item \texttt{OUTPUT}: percorso del file di output \texttt{x.txt}.
+  \item \texttt{\_SHM = "/dev/shm"}: RAM disk di Linux. File scritti qui risiedono in RAM.
+  \item \texttt{N\_WORKERS}: numero di thread paralleli = numero di CPU logiche della macchina.
+        Il \texttt{max(1, ...)} garantisce almeno 1 worker anche su macchine senza cpu\_count.
+\end{itemize}
+
+\subsection{Interfaccia con il simulatore}
+
+\begin{lstlisting}[language=Python]
+def _write_x(x_flat: np.ndarray, path: str) -> None:
+    """Write 2000 floats (one per line) to a RAM-disk path."""
+    np.savetxt(path, x_flat, fmt="%.15g")
+
+
+def eval_f4(x_flat: np.ndarray, path: str) -> float:
+    """Invoke  mobd <path> -b  and return the float value of f4."""
+    _write_x(x_flat, path)
+    proc = subprocess.run([SIMULATOR, path, "-b"],
+                          capture_output=True, text=True, check=True)
+    return float(proc.stdout.strip())
+\end{lstlisting}
+
+§§CAP§Righe 68–78 — Scrittura file e chiamata al simulatore§§
+
+
+
+\textbf{\texttt{\_write\_x}:}
+\begin{itemize}[nosep]
+  \item Riceve \texttt{x\_flat}: array monodimensionale di 2000 float (formato del simulatore).
+  \item \texttt{np.savetxt(path, x\_flat, fmt="\%.15g")}: scrive un valore per riga con 15
+        cifre significative (\texttt{\%g} evita notazione scientifica non necessaria).
+\end{itemize}
+
+\textbf{\texttt{eval\_f4}:}
+\begin{itemize}[nosep]
+  \item Scrive il vettore su file, poi lancia il simulatore con \texttt{subprocess.run}.
+  \item \texttt{[SIMULATOR, path, "-b"]}: lista di argomenti (evita shell injection).
+  \item \texttt{capture\_output=True}: cattura stdout/stderr senza stamparli.
+  \item \texttt{text=True}: decodifica l'output come stringa UTF-8.
+  \item \texttt{check=True}: solleva \texttt{CalledProcessError} se il simulatore termina
+        con codice diverso da 0.
+  \item \texttt{float(proc.stdout.strip())}: converte la stringa di output nel valore numerico.
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+def _perturb_eval(args: tuple) -> float:
+    """Worker: perturb x_flat at index idx by +H and eval f4."""
+    x_snap, idx, worker_path = args
+    p = x_snap.copy()
+    p[idx] += H
+    return eval_f4(p, worker_path)
+
+
+def eval_f4_all_partials(
+    x_snap: np.ndarray,
+    f4_base: float,
+) -> np.ndarray:
+    """
+    Compute f4 partial-gradient for every block simultaneously.
+    Uses forward FD: df4/dx^i_j ~= (f4(x+H*e_{2i+j}) - f4_base) / H
+    Returns g_f4 : (m, 2) array.
+    """
+    worker_paths = [os.path.join(_SHM, f"mobd_w{k}.txt")
+                    for k in range(N_WORKERS)]
+    tasks = []
+    for i in range(M):
+        tasks.append((x_snap, 2 * i,     worker_paths[(2 * i)     % N_WORKERS]))
+        tasks.append((x_snap, 2 * i + 1, worker_paths[(2 * i + 1) % N_WORKERS]))
+
+    results = [None] * (2 * M)
+    with ThreadPoolExecutor(max_workers=N_WORKERS) as pool:
+        future_to_idx = {
+            pool.submit(_perturb_eval, t): k
+            for k, t in enumerate(tasks)
+        }
+        for fut in as_completed(future_to_idx):
+            results[future_to_idx[fut]] = fut.result()
+
+    g_f4 = np.empty((M, 2), dtype=np.float64)
+    for i in range(M):
+        g_f4[i, 0] = (results[2 * i]     - f4_base) / H
+        g_f4[i, 1] = (results[2 * i + 1] - f4_base) / H
+    return g_f4
+\end{lstlisting}
+
+§§CAP§Righe 81–125 — Worker function e calcolo parallelo del gradiente di $f_4$§§
+
+
+
+\textbf{\texttt{\_perturb\_eval}:}
+\begin{itemize}[nosep]
+  \item Funzione worker eseguita su ogni thread.
+  \item \texttt{x\_snap.copy()}: copia difensiva per evitare race condition (ogni thread lavora
+        su una copia indipendente del vettore).
+  \item \texttt{p[idx] += H}: aggiunge il passo $H$ alla coordinata \texttt{idx}.
+  \item Chiama \texttt{eval\_f4(p, worker\_path)} e restituisce il valore scalare.
+\end{itemize}
+
+\textbf{\texttt{eval\_f4\_all\_partials}:}
+\begin{itemize}[nosep]
+  \item \texttt{worker\_paths}: $N$ path distinti su \texttt{/dev/shm}, uno per thread.
+        I thread non si sovrascrivono a vicenda perché ognuno scrive sul proprio file.
+  \item \textbf{Costruzione dei task}: per ogni modulo $i$ si creano 2 task (uno per
+        coordinata). La tupla contiene \texttt{(x\_snap, indice, path\_worker)}.
+        L'assegnazione \texttt{(2*i) \% N\_WORKERS} distribuisce i task ciclicamente tra
+        i worker (round-robin), bilanciando il carico.
+  \item \texttt{results = [None] * (2*M)}: lista pre-allocata di 2000 slot.
+  \item \textbf{Pool di thread}: \texttt{ThreadPoolExecutor} mantiene $N$ thread attivi.
+        \texttt{pool.submit(\_perturb\_eval, t)} schedula il task $t$ sul pool e restituisce
+        un \texttt{Future}.
+  \item \texttt{future\_to\_idx}: dizionario che mappa ogni Future al suo indice originale,
+        necessario per ricostruire l'ordine dei risultati.
+  \item \texttt{as\_completed(...)}: itera sui Future man mano che completano (non in ordine),
+        scrivendo il risultato nella posizione corretta di \texttt{results}.
+  \item \textbf{Costruzione di \texttt{g\_f4}}: applica la formula delle differenze finite
+        $\hat{\partial}_{ij} f_4 = (\text{results}[2i+j] - f_4^{\text{base}}) / H$.
+  \item Restituisce un array $(m \times 2)$ del gradiente approssimato di $f_4$.
+\end{itemize}
+
+\begin{remark}
+Si usa \texttt{ThreadPoolExecutor} (thread, non processi) perché il collo di bottiglia è
+I/O (scrittura file + attesa del simulatore esterno), non CPU.
+Il GIL (Global Interpreter Lock) di Python non è un problema qui: i thread si bloccano
+sull'\texttt{I/O} e il simulatore gira come processo separato.
+\end{remark}
+
+\subsection{Funzioni di costo analitiche}
+
+\begin{lstlisting}[language=Python]
+def compute_f1(X: np.ndarray) -> float:
+    """f1 = 0.1 * sum_{i<j} (1 - exp(-||x^i - x^j||^2))"""
+    diff = X[:, None, :] - X[None, :, :]          # (m, m, 2)
+    sq   = np.einsum("ijk,ijk->ij", diff, diff)    # (m, m)
+    return float(0.1 * (M * (M - 1) / 2 - np.triu(np.exp(-sq), k=1).sum()))
+
+
+def compute_f2(X: np.ndarray) -> float:
+    """f2 = (1/m) * sum_i sum_q ||x^i - z^q||^2"""
+    diff = X[:, None, :] - STATIONS[None, :, :]   # (m, 5, 2)
+    return float(np.einsum("ijk,ijk->", diff, diff) / M)
+
+
+def compute_f3(X: np.ndarray, S: np.ndarray) -> float:
+    """f3 = 1000 * sum_i (log(1+||x^i-s^i||^2)/log(1+r^2) - 1)^2"""
+    d2  = np.einsum("ij,ij->i", X - S, X - S)
+    phi = np.log1p(d2) / LOG1R2 - 1.0
+    return float(1000.0 * phi @ phi)
+
+
+def compute_f_known(X: np.ndarray, S: np.ndarray) -> float:
+    return compute_f1(X) + compute_f2(X) + compute_f3(X, S)
+\end{lstlisting}
+
+§§CAP§Righe 132–153 — $f_1$, $f_2$, $f_3$ e loro somma§§
+
+
+
+\textbf{\texttt{compute\_f1}:}
+\begin{itemize}[nosep]
+  \item \texttt{X[:, None, :] - X[None, :, :]}: broadcasting NumPy — crea la matrice $(m \times m \times 2)$ di tutte le differenze $x^i - x^j$.
+  \item \texttt{np.einsum("ijk,ijk->ij", diff, diff)}: calcola $\|x^i - x^j\|^2$ per ogni coppia $(i,j)$ → matrice $(m \times m)$.
+  \item $f_1 = 0.1 \sum_{i<j}(1-e^{-\|x^i-x^j\|^2}) = 0.1\bigl[\binom{m}{2} - \sum_{i<j} e^{-\|x^i-x^j\|^2}\bigr]$.
+  \item \texttt{np.triu(..., k=1)}: triangolare superiore con $k=1$ esclude la diagonale, sommando solo le coppie $i < j$.
+\end{itemize}
+
+\textbf{\texttt{compute\_f2}:}
+\begin{itemize}[nosep]
+  \item \texttt{X[:, None, :] - STATIONS[None, :, :]}: differenze $(m \times 5 \times 2)$.
+  \item \texttt{np.einsum("ijk,ijk->", ...)}: somma di tutti i quadrati scalari (contrazione completa).
+  \item Risultato diviso per $m$.
+\end{itemize}
+
+\textbf{\texttt{compute\_f3}:}
+\begin{itemize}[nosep]
+  \item \texttt{X - S}: differenza componente per componente $(m \times 2)$.
+  \item \texttt{np.einsum("ij,ij->i", ...)}: norma quadratica per riga → vettore $m$ di $\|x^i - s^i\|^2$.
+  \item \texttt{np.log1p(d2)}: $\log(1 + d^2)$ — \texttt{log1p} è numericamente più stabile
+        di \texttt{log(1+x)} per $x$ piccoli.
+  \item \texttt{phi}: vettore $m$ di $\phi_i = \log(1+\|x^i-s^i\|^2)/\log(1+r^2) - 1$.
+  \item \texttt{phi @ phi}: prodotto scalare $\sum_i \phi_i^2$ — scrittura compatta per la somma dei quadrati.
+\end{itemize}
+
+\subsection{Gradienti parziali analitici per blocco}
+
+\begin{lstlisting}[language=Python]
+def grad_f1_i(i: int, X: np.ndarray) -> np.ndarray:
+    """df1/dx^i = 0.2 * sum_{j!=i} (x^i-x^j) * exp(-||x^i-x^j||^2)"""
+    d  = X[i] - X
+    sq = np.einsum("ij,ij->i", d, d)
+    w  = np.exp(-sq)
+    w[i] = 0.0
+    return 0.2 * (w[:, None] * d).sum(axis=0)
+
+
+def grad_f2_i(i: int, X: np.ndarray) -> np.ndarray:
+    """df2/dx^i = (10/m)*x^i   (uses sum_q z^q = 0)"""
+    return (10.0 / M) * X[i]
+
+
+def grad_f3_i(i: int, X: np.ndarray, S: np.ndarray) -> np.ndarray:
+    """df3/dx^i = 4000*phi_i*(x^i-s^i) / ((1+D_i)*log(1+r^2))"""
+    d   = X[i] - S[i]
+    D   = float(d @ d)
+    phi = np.log1p(D) / LOG1R2 - 1.0
+    return (4000.0 * phi / ((1.0 + D) * LOG1R2)) * d
+\end{lstlisting}
+
+§§CAP§Righe 160–179 — Gradienti parziali di $f_1$, $f_2$, $f_3$ per il blocco $i$§§
+
+
+
+\textbf{\texttt{grad\_f1\_i}:}
+
+Si ricava derivando $f_1$ rispetto a $x^i$:
+\[
+  \frac{\partial f_1}{\partial x^i} = 0.1 \sum_{j \neq i} \frac{\partial}{\partial x^i}
+  \bigl(1 - e^{-\|x^i - x^j\|^2}\bigr)
+  = 0.2 \sum_{j \neq i} (x^i - x^j) e^{-\|x^i - x^j\|^2}.
+\]
+\begin{itemize}[nosep]
+  \item \texttt{d = X[i] - X}: array $(m \times 2)$ di tutte le differenze $x^i - x^j$
+        (inclusa $j=i$, che però vale $(0,0)$).
+  \item \texttt{sq}: vettore $m$ di $\|x^i - x^j\|^2$.
+  \item \texttt{w = exp(-sq)}: pesi.
+  \item \texttt{w[i] = 0.0}: annulla il contributo del termine $j=i$ (evita di sottrarlo esplicitamente).
+  \item \texttt{(w[:, None] * d).sum(axis=0)}: somma pesata delle differenze → vettore 2D.
+\end{itemize}
+
+\textbf{\texttt{grad\_f2\_i}:}
+
+Si ricava derivando $f_2$ rispetto a $x^i$:
+\[
+  \frac{\partial f_2}{\partial x^i}
+  = \frac{2}{m} \sum_{q=0}^{4} (x^i - z^q)
+  = \frac{2}{m} \Bigl(5 x^i - \sum_{q=0}^4 z^q\Bigr)
+  = \frac{10}{m} x^i,
+\]
+dove si usa il fatto che $\sum_{q=0}^4 z^q = (0,0)$ (le 5 stazioni si bilanciano perfettamente).
+Questa è una \textbf{semplificazione chiave}: il gradiente è semplicemente proporzionale a $x^i$.
+
+\textbf{\texttt{grad\_f3\_i}:}
+
+Si ricava derivando $f_3$ rispetto a $x^i$:
+\[
+  \frac{\partial f_3}{\partial x^i}
+  = 2 \cdot 1000 \cdot \phi_i \cdot \frac{2(x^i - s^i)}{(1 + \|x^i - s^i\|^2)\log(1+r^2)}
+  = \frac{4000 \, \phi_i \,(x^i - s^i)}{(1 + D_i)\log(1+r^2)},
+\]
+dove $D_i = \|x^i - s^i\|^2$ e $\phi_i = \log(1+D_i)/\log(1+r^2) - 1$.
+\begin{itemize}[nosep]
+  \item \texttt{d = X[i] - S[i]}: vettore $(x^i - s^i) \in \R^2$.
+  \item \texttt{D = d @ d}: $\|x^i - s^i\|^2$ come scalare.
+  \item \texttt{phi}: $\phi_i$ calcolato per il modulo $i$.
+  \item Il risultato è un vettore 2D scalato per il coefficiente $4000\phi_i / ((1+D_i)\log(1+r^2))$.
+\end{itemize}
+
+\subsection{Warm start}
+
+\begin{lstlisting}[language=Python]
+def warm_start() -> tuple:
+    """
+    Ref points: s^i = ((-1)^i*i*0.2, (-1)^i*i*0.2), i=1..m.
+    Place each module at distance r from s^i toward origin:
+        x^i = s^i + r * (-s^i / ||s^i||)
+    ||x^i - s^i|| = r  =>  phi_i = 0  =>  f3 = 0.
+    """
+    idx  = np.arange(1, M + 1, dtype=np.float64)
+    sign = np.where(idx % 2 == 0, 1.0, -1.0)
+    S    = np.column_stack([sign * idx * 0.2, sign * idx * 0.2])
+    nrm  = np.linalg.norm(S, axis=1, keepdims=True)
+    safe = np.where(nrm < 1e-12, 1.0, nrm)
+    X    = S + R * (-S / safe)
+    X[nrm[:, 0] < 1e-12] = [R, 0.0]
+    return X, S
+\end{lstlisting}
+
+§§CAP§Righe 186–201 — Inizializzazione con $f_3 = 0$§§
+
+
+
+\begin{itemize}[nosep]
+  \item \texttt{idx}: array $[1, 2, \ldots, 1000]$ dei numeri di modulo.
+  \item \texttt{sign}: $(-1)^i$ — vale $-1$ se $i$ dispari, $+1$ se $i$ pari.
+  \item \texttt{S}: array $(m \times 2)$ dei punti di riferimento
+        $s^i = ((-1)^i \cdot i \cdot 0.2,\; (-1)^i \cdot i \cdot 0.2)$.
+  \item \texttt{nrm}: norma $\|s^i\|$ per ogni modulo.
+  \item \texttt{safe}: versione di \texttt{nrm} con i valori troppo piccoli sostituiti con 1
+        (guard contro divisione per zero per $s^i \approx 0$).
+  \item \texttt{X = S + R * (-S / safe)}: formula geometrica. Si parte da $s^i$ e ci si sposta
+        di $r = 100$ nella direzione $-s^i / \|s^i\|$ (verso l'origine).
+        Così $\|x^i - s^i\| = r$ esattamente, e quindi $\phi_i = 0$ e $f_3 = 0$.
+  \item \texttt{X[nrm < 1e-12] = [R, 0.0]}: caso degenere $s^i \approx 0$ (solo per $i=0$,
+        che nel nostro caso non esiste perché $i$ parte da 1). Fallback: posiziona in $(R, 0)$.
+  \item Restituisce la coppia \texttt{(X, S)}: posizioni iniziali e punti di riferimento.
+\end{itemize}
+
+\subsection{Loop principale RBCD}
+
+\begin{lstlisting}[language=Python]
+def rbcd(
+    n_epochs:    int   = 20,
+    alpha_0:     float = 0.02,
+    beta:        float = 0.05,
+    gamma:       float = 0.60,
+    seed:        int   = 42,
+    use_f4_grad: bool  = True,
+    resume:      bool  = True,
+) -> np.ndarray:
+\end{lstlisting}
+
+§§CAP§Righe 208–268 — Firma funzione e inizializzazione§§
+
+
+
+\begin{itemize}[nosep]
+  \item \texttt{n\_epochs}: numero di epoche (sweep completi su tutti gli $m$ blocchi).
+  \item \texttt{alpha\_0}: stepsize iniziale $\alpha_0$.
+  \item \texttt{beta, gamma}: parametri dello schedule decrescente $\alpha_k = \alpha_0 / (1 + \beta k)^\gamma$.
+  \item \texttt{seed}: seme per la generazione delle permutazioni casuali (riproducibilità).
+  \item \texttt{use\_f4\_grad}: se \texttt{True} usa le differenze finite per $f_4$
+        (modalità spec-compliant); se \texttt{False} usa solo i gradienti analitici di
+        $f_1 + f_2 + f_3$ (modalità diagnostica veloce).
+  \item \texttt{resume}: se \texttt{True} e \texttt{x.txt} esiste, riprende da quel punto
+        invece che dal warm start.
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+    rng = np.random.default_rng(seed)
+
+    X, S = warm_start()
+    print("Warm start computed  (f3 = 0 by construction)")
+
+    if resume and os.path.exists(OUTPUT):
+        try:
+            xl = np.loadtxt(OUTPUT)
+            if xl.size == 2 * M:
+                X = xl.reshape(M, 2)
+                print(f"Resumed from existing  {OUTPUT}")
+        except Exception as exc:
+            print(f"Could not load {OUTPUT}: {exc}")
+
+    np.savetxt(OUTPUT, X.flatten(), fmt="%.15g")
+
+    t0     = time.time()
+    tmp0   = os.path.join(_SHM, "mobd_init.txt")
+    f4_now = eval_f4(X.flatten(), tmp0)
+    fk     = compute_f_known(X, S)
+    total  = fk + f4_now
+    best   = total
+    best_X = X.copy()
+    np.savetxt(OUTPUT, best_X.flatten(), fmt="%.15g")
+\end{lstlisting}
+
+§§CAP§Righe 230–256 — Inizializzazione e prima valutazione§§
+
+
+
+\begin{itemize}[nosep]
+  \item \texttt{np.random.default\_rng(seed)}: generatore random moderno (NumPy >= 1.17),
+        con seed fisso per riproducibilità.
+  \item \texttt{warm\_start()}: calcola posizioni iniziali con $f_3 = 0$.
+  \item Blocco \texttt{if resume}: tenta di caricare una soluzione precedente da \texttt{x.txt}.
+        Controlla che abbia esattamente 2000 valori. In caso di errore di lettura,
+        usa il warm start (il \texttt{try/except} è un guard generico).
+  \item \texttt{np.savetxt(OUTPUT, X.flatten(), ...)}: salva immediatamente il checkpoint
+        iniziale (garantisce che \texttt{x.txt} sia sempre valido anche se il programma
+        viene interrotto prima della prima epoca).
+  \item \texttt{X.flatten()}: converte l'array $(m \times 2)$ in un vettore monodimensionale
+        di 2000 elementi (formato richiesto dal simulatore).
+  \item Prima valutazione di $f_4$ e delle componenti analitiche: stabilisce il valore iniziale
+        e imposta \texttt{best = total}, \texttt{best\_X = X.copy()}.
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+    for ep in range(n_epochs):
+        t_ep  = time.time()
+        alpha = alpha_0 / (1.0 + beta * ep) ** gamma
+        order = rng.permutation(M)
+
+        if use_f4_grad:
+            snap    = X.flatten()
+            f4_base = f4_now
+            t_fd    = time.time()
+            g_f4    = eval_f4_all_partials(snap, f4_base)
+            print(f"  [f4 FD done in {time.time()-t_fd:.1f}s]", flush=True)
+        else:
+            g_f4 = np.zeros((M, 2), dtype=np.float64)
+
+        for i in order:
+            g = (grad_f1_i(i, X)
+                 + grad_f2_i(i, X)
+                 + grad_f3_i(i, X, S)
+                 + g_f4[i])
+            X[i] -= alpha * g
+\end{lstlisting}
+
+§§CAP§Righe 269–290 — Loop principale: un'epoca§§
+
+
+
+\begin{itemize}[nosep]
+  \item \texttt{alpha = alpha\_0 / (1.0 + beta * ep) ** gamma}: stepsize decrescente
+        $\alpha_k = \alpha_0 / (1 + \beta k)^\gamma$ valutato all'epoca $k = \texttt{ep}$.
+  \item \texttt{order = rng.permutation(M)}: permutazione casuale degli indici
+        $\{0, 1, \ldots, 999\}$ — questo è il cuore della strategia \textbf{randomizzata}.
+  \item \textbf{Stale-base}: \texttt{snap = X.flatten()} è lo snapshot all'inizio dell'epoca;
+        \texttt{f4\_base = f4\_now} è il valore di $f_4$ calcolato alla fine dell'epoca precedente
+        (e quindi corrispondente a \texttt{snap}). Questo garantisce la coerenza delle differenze
+        finite.
+  \item \textbf{Gauss-Seidel}: il ciclo \texttt{for i in order} aggiorna i blocchi
+        sequenzialmente nell'ordine casuale. Ogni aggiornamento \texttt{X[i] -= alpha * g}
+        modifica immediatamente \texttt{X}, per cui i blocchi successivi vedono le posizioni
+        già aggiornate — questo è esattamente la caratteristica della variante Gauss-Seidel.
+  \item \texttt{g\_f4[i]}: il gradiente di $f_4$ per il blocco $i$ è quello calcolato
+        all'inizio dell'epoca (stale), non viene ricalcolato durante l'epoch.
+  \item \texttt{g = grad\_f1\_i + grad\_f2\_i + grad\_f3\_i + g\_f4[i]}: gradiente totale
+        del blocco $i$, somma dei quattro contributi.
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+        tmp_ep = os.path.join(_SHM, "mobd_epoch.txt")
+        f4_now = eval_f4(X.flatten(), tmp_ep)
+        fk     = compute_f_known(X, S)
+        total  = fk + f4_now
+        dt     = time.time() - t_ep
+
+        print(f"Epoch {ep+1:3d}/{n_epochs}  total={total:.2f}"
+              f"  (f1={compute_f1(X):.2f}  f2={compute_f2(X):.2f}"
+              f"  f3={compute_f3(X,S):.2f}  f4={f4_now:.2f})"
+              f"  a={alpha:.5f}  t={dt:.1f}s",
+              flush=True)
+
+        if total < best:
+            best   = total
+            best_X = X.copy()
+            np.savetxt(OUTPUT, best_X.flatten(), fmt="%.15g")
+            print(f"  New best! Saved to {OUTPUT}", flush=True)
+\end{lstlisting}
+
+§§CAP§Righe 292–311 — Fine epoca: valutazione, log e checkpointing§§
+
+
+
+\begin{itemize}[nosep]
+  \item \texttt{f4\_now = eval\_f4(X.flatten(), tmp\_ep)}: una sola chiamata al simulatore
+        per ottenere il costo $f_4$ aggiornato. Questo valore servirà anche come
+        \texttt{f4\_base} per la prossima epoca.
+  \item \texttt{total = fk + f4\_now}: costo totale $f_1 + f_2 + f_3 + f_4$.
+  \item \textbf{Checkpointing}: se il costo totale è migliorato rispetto al miglior valore
+        precedente, si salva immediatamente la soluzione in \texttt{x.txt}.
+        Questo garantisce che anche in caso di interruzione, si conserva sempre la miglior
+        soluzione trovata finora.
+  \item \texttt{flush=True}: forza la scrittura immediata su stdout, utile per monitorare
+        il progresso in esecuzioni lunghe.
+\end{itemize}
+
+\subsection{Modalità operative: fast, full, both}
+
+\begin{lstlisting}[language=Python]
+    if args.mode in ("fast", "both"):
+        rbcd(
+            n_epochs    = args.fast_epochs,
+            alpha_0     = args.alpha0,
+            use_f4_grad = False,   # solo gradiente analitico
+            resume      = resume,
+        )
+        resume = True
+
+    if args.mode in ("full", "both"):
+        rbcd(
+            n_epochs    = args.full_epochs,
+            alpha_0     = args.alpha0 * 0.5,  # step piu' piccolo dopo warm-up
+            use_f4_grad = True,
+            resume      = True,
+        )
+\end{lstlisting}
+
+§§CAP§Righe 363–391 — Entry point con le tre modalità§§
+
+
+
+Le tre modalità sono:
+
+\begin{itemize}
+  \item \textbf{\texttt{fast}}: usa solo $\grad(f_1 + f_2 + f_3)$ senza mai chiamare il
+        simulatore durante le epoche. Ogni epoca costa O(ms) invece di 5+ minuti.
+        Utile per scendere velocemente nella direzione di $f_1 + f_2 + f_3$.
+        \textbf{Limite}: può peggiorare $f_4$ perché non ne minimizza il gradiente.
+  \item \textbf{\texttt{full}}: modalità spec-compliant. Ogni epoca calcola le 2000 perturbazioni
+        di $f_4$ in parallelo. È la modalità da usare per la competizione.
+  \item \textbf{\texttt{both}}: prima esegue la fase \texttt{fast} (warm-up) poi la fase
+        \texttt{full} con stepsize dimezzato ($\alpha_0 \times 0.5$) per affinare la soluzione.
+        Nella fase 2 si usa \texttt{resume=True}, cioè si parte dalla soluzione trovata nella fase 1.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Convergenza: garanzie teoriche}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Verifica delle condizioni per la convergenza}
+
+
+
+\noindent §§BOXSTART§thmbox§§
+
+\textbf{Convergenza del RBCD Gauss-Seidel con stepsize decrescente}
+
+
+Sia $f = f_1 + f_2 + f_3 + f_4$ con le seguenti ipotesi:
+\begin{enumerate}
+  \item $f$ è continuamente differenziabile su $\R^{2000}$.
+  \item $\grad f$ è Lipschitz continuo (soddisfatto poiché $f_1, f_2, f_3$ hanno gradienti
+        Lipschitz, e si assume che anche $f_4$ abbia questa proprietà).
+  \item Lo stepsize soddisfa: $\alpha_k \to 0$ e $\sum_k \alpha_k = +\infty$.
+\end{enumerate}
+Allora ogni punto di accumulazione della sequenza $\{X_k\}$ generata dall'algoritmo RBCD
+Gauss-Seidel è un \textbf{punto stazionario} di $f$, cioè $\grad f(X^*) = 0$.
+
+
+\noindent §§BOXEND§§
+
+
+
+\textbf{Verifica per il nostro schedule} $\alpha_k = \alpha_0 / (1 + \beta k)^\gamma$
+con $\alpha_0 = 0.01$, $\beta = 0.05$, $\gamma = 0.60$:
+\[
+  \lim_{k\to\infty} \alpha_k = 0 \quad\checkmark, \qquad
+  \sum_{k=0}^\infty \alpha_k = \sum_{k=0}^\infty \frac{\alpha_0}{(1+\beta k)^\gamma}
+  = +\infty \quad (\gamma = 0.6 < 1) \quad\checkmark.
+\]
+
+\subsection{Complessità}
+
+Nel caso non convesso, per ottenere $\min_{k \leq K} \|\grad f(X_k)\|^2 \leq \varepsilon$,
+il numero di iterazioni (chiamate al gradiente) richieste è:
+\[
+  K = O\!\left(\frac{1}{\varepsilon}\right) \cdot \frac{1}{\alpha_K} = O\!\left(\frac{1}{\varepsilon^2}\right),
+\]
+analoga alla complessità del metodo del gradiente standard per problemi non convex.
+
+\subsection{Accuratezza del gradiente di $f_4$}
+
+L'errore delle differenze finite in avanti è:
+\[
+  \left|\frac{f_4(x + H e_k) - f_4(x)}{H} - \frac{\partial f_4}{\partial x_k}(x)\right|
+  = O(H),
+\]
+per $H \to 0$. Con $H = 10^{-4}$, l'errore di troncamento è dell'ordine $10^{-4} \cdot L$,
+dove $L$ è la costante di Lipschitz di $\grad f_4$.
+
+\begin{remark}
+In teoria, le differenze finite introducono un errore nel gradiente che viola strettamente
+la condizione gradient-related. Tuttavia, per errori sufficientemente piccoli, i metodi
+a gradiente approssimato mantengono le stesse garanzie di convergenza a un punto stazionario
+approssimato.
+\end{remark}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Riepilogo delle scelte progettuali}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}p{0.22\textwidth}p{0.35\textwidth}p{0.35\textwidth}@{}}
+\toprule
+\textbf{Aspetto} & \textbf{Problema/Vincolo} & \textbf{Soluzione adottata} \\
+\midrule
+Algoritmo & Dimensione $n=2000$, no struttura convessa garantita &
+  RBCD Gauss-Seidel, convergenza a punti stazionari \\
+Gradiente $f_4$ & Black-box, no formula analitica &
+  Differenze finite in avanti, $H=10^{-4}$ \\
+Costo computazionale & 2000 chiamate/epoca $\times$ 5s = 2.8h sequenziale &
+  ThreadPoolExecutor con $N$ worker paralleli \\
+I/O & Scritture frequenti su disco $\to$ collo di bottiglia &
+  RAM disk \texttt{/dev/shm} \\
+Inizializzazione & Rischio trappole locali con $f_3 \gg 0$ &
+  Warm start costruttivo con $f_3=0$ \\
+Coerenza FD & Base inconsistente durante l'epoch Gauss-Seidel &
+  Strategia stale-base: snapshot a inizio epoca \\
+Robustezza & Interruzioni durante esecuzioni lunghe &
+  Checkpointing: salva best\_X dopo ogni epoca \\
+Stepsize & Garantire convergenza teorica &
+  Schedule decrescente $\alpha_k = \alpha_0/(1+\beta k)^\gamma$, $\gamma=0.6$ \\
+\bottomrule
+\end{tabular}
+\caption{Riepilogo delle principali scelte progettuali.}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Come eseguire il codice}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{lstlisting}[language=Python]
+# Modalita' FULL (spec-compliant, raccomandata per la competizione):
+python mobd_optimizer.py --mode full --full-epochs 20
+
+# Modalita' FAST (solo gradienti analitici, per debug):
+python mobd_optimizer.py --mode fast --fast-epochs 100
+
+# Modalita' BOTH (warm-up analitico poi full):
+python mobd_optimizer.py --mode both --fast-epochs 50 --full-epochs 20
+
+# Riprendere da x.txt esistente (default) o ricominciare dal warm start:
+python mobd_optimizer.py --mode full --no-resume
+
+# Controllare la soluzione con il simulatore:
+./linux/mobd x.txt -b     # solo f4
+./linux/mobd x.txt -t     # tutto (solo per verifica manuale, non nel codice)
+\end{lstlisting}
+
+§§CAP§Comandi di esecuzione§§
+
+
+
+\textbf{Parametri disponibili:}
+\begin{itemize}[nosep]
+  \item \texttt{--alpha0}: stepsize iniziale (default 0.01)
+  \item \texttt{--beta}: parametro $\beta$ dello schedule (default 0.05)
+  \item \texttt{--gamma}: esponente $\gamma$ dello schedule (default 0.60)
+  \item \texttt{--seed}: seme random (default 42)
+  \item \texttt{--workers}: numero di thread per $f_4$ (default: \texttt{os.cpu\_count()})
+  \item \texttt{--no-resume}: ignora \texttt{x.txt} esistente, riparte dal warm start
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Vincoli e regole della competizione rispettati}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{itemize}
+  \item \textbf{Nessuna libreria esterna di ottimizzazione}: tutte le routine (BCD, gradiente,
+        FD) sono implementate da zero in Python/NumPy. Non si usa scipy.optimize, cvxpy, o
+        librerie equivalenti.
+  \item \textbf{Solo opzione \texttt{-b}}: il simulatore viene invocato esclusivamente con
+        \texttt{-b} (solo $f_4$). L'opzione \texttt{-t} (totale) non viene mai usata nel codice.
+  \item \textbf{Formato di output corretto}: \texttt{x.txt} viene scritto con \texttt{np.savetxt}
+        con formato \texttt{\%.15g}, producendo esattamente 2000 righe con un valore reale
+        per riga, senza righe vuote.
+  \item \textbf{Linguaggio a scelta}: Python 3, consentito.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Conclusioni}
+% ══════════════════════════════════════════════════════════════════════════════
+
+Il progetto MOBD è stato affrontato come un problema di ottimizzazione non vincolata su
+$\R^{2000}$. La struttura a blocchi naturale del problema (ogni blocco = 2D di un modulo)
+ha suggerito l'impiego del \textbf{Randomized Block Coordinate Descent} nella variante
+Gauss-Seidel, con permutazione casuale ad ogni epoca per evitare bias sistematici.
+
+La presenza di $f_4$ black-box ha richiesto di approssimare il gradiente tramite
+\textbf{differenze finite in avanti}, con parallelizzazione su thread per rendere
+computazionalmente praticabile ogni epoca.
+
+Lo stepsize decrescente $\alpha_k = \alpha_0 / (1 + \beta k)^\gamma$ garantisce le condizioni
+teoriche di convergenza (Teorema del corso). La strategia di warm start con $f_3 = 0$
+fornisce un punto di partenza strutturalmente buono, e il checkpointing garantisce la
+robustezza dell'esecuzione.
+
+L'algoritmo è stato implementato in Python puro + NumPy, nel pieno rispetto delle regole
+della competizione, senza uso di librerie di ottimizzazione esterne.
+
+% ──────────────────────────────────────────────────────────────────────────────
+\vspace{2cm}
+\begin{center}
+\rule{0.5\textwidth}{0.4pt}\\[0.3em]
+{\small Corso di Metodi di Ottimizzazione per Big Data — A.A.\ 2025/2026\\
+Prof.\ Andrea Cristofari — Università di Roma ``Tor Vergata''}
+\end{center}
+
+\end{document}
