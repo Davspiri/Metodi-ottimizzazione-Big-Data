@@ -236,16 +236,16 @@ def rbcd(
 
     # inizializzazione
     X, S = warm_start()
-    print("Warm start computed  (f3 = 0 by construction)")
+    print("Warm start fatto (f3 = 0 all'inizio)")
 
     if resume and os.path.exists(OUTPUT):
         try:
             xl = np.loadtxt(OUTPUT)
             if xl.size == 2 * M:
                 X = xl.reshape(M, 2)
-                print(f"Resumed from existing  {OUTPUT}")
+                print(f"Riparto da {OUTPUT}")
         except Exception as exc:
-            print(f"Could not load {OUTPUT}: {exc}")
+            print(f"Non riesco a leggere {OUTPUT}: {exc}")
 
     # salviamo subito un x.txt valido (almeno il warm start)
     np.savetxt(OUTPUT, X.flatten(), fmt="%.15g")
@@ -260,16 +260,14 @@ def rbcd(
     best_X = X.copy()
     np.savetxt(OUTPUT, best_X.flatten(), fmt="%.15g")
 
-    mode_str = (f"FULL — forward FD for f4  [{N_WORKERS} parallel workers, "
-                f"~{int(np.ceil(2*M/N_WORKERS)*5/60)} min/epoch]"
+    mode_str = (f"completa - f4 con differenze finite ({N_WORKERS} thread, "
+                f"circa {int(np.ceil(2*M/N_WORKERS)*5/60)} min a epoca)"
                 if use_f4_grad
-                else "FAST — analytical gradient only  [~0 s/epoch]")
-    print(f"\n{'═'*64}")
-    print(f"Mode  : {mode_str}")
-    print(f"Init  : f1={compute_f1(X):.2f}  f2={compute_f2(X):.2f}"
+                else "veloce - solo gradienti analitici (~0 s a epoca)")
+    print(f"\nModalita': {mode_str}")
+    print(f"Inizio: f1={compute_f1(X):.2f}  f2={compute_f2(X):.2f}"
           f"  f3={compute_f3(X,S):.2f}  f4={f4_now:.2f}")
-    print(f"Total : {total:.2f}   ({time.time()-t0:.1f} s)")
-    print(f"{'═'*64}\n")
+    print(f"Totale: {total:.2f}  ({time.time()-t0:.1f} s)\n")
 
     for ep in range(n_epochs):
         t_ep  = time.time()
@@ -282,7 +280,7 @@ def rbcd(
             f4_base = f4_now        # f4(snap), gia' calcolata a fine epoca precedente
             t_fd    = time.time()
             g_f4    = eval_f4_all_partials(snap, f4_base)
-            print(f"  [f4 FD done in {time.time()-t_fd:.1f}s]", flush=True)
+            print(f"  [gradiente di f4 calcolato in {time.time()-t_fd:.1f}s]", flush=True)
         else:
             g_f4 = np.zeros((M, 2), dtype=np.float64)
 
@@ -301,17 +299,17 @@ def rbcd(
         total  = fk + f4_now
         dt     = time.time() - t_ep
 
-        print(f"Epoch {ep+1:3d}/{n_epochs}  total={total:.2f}"
+        print(f"Epoca {ep+1:3d}/{n_epochs}  tot={total:.2f}"
               f"  (f1={compute_f1(X):.2f}  f2={compute_f2(X):.2f}"
               f"  f3={compute_f3(X,S):.2f}  f4={f4_now:.2f})"
-              f"  α={alpha:.5f}  t={dt:.1f}s",
+              f"  alpha={alpha:.5f}  t={dt:.1f}s",
               flush=True)
 
         if total < best:
             best   = total
             best_X = X.copy()
             np.savetxt(OUTPUT, best_X.flatten(), fmt="%.15g")
-            print(f"  ↳ New best! Saved to {OUTPUT}  (Δ={best-total:.2f})",
+            print(f"  nuovo minimo, salvato in {OUTPUT}",
                   flush=True)
 
     return best_X
@@ -323,7 +321,7 @@ def rbcd(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="MOBD RBCD optimizer — Mars Operations Base Deployment",
+        description="Ottimizzatore RBCD per il progetto MOBD",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument(
@@ -331,28 +329,27 @@ def parse_args() -> argparse.Namespace:
         choices=["fast", "full", "both"],
         default="full",
         help=(
-            "full : spec-compliant RBCD with f4 FD (parallelised) — RECOMMENDED | "
-            "fast : analytical gradient only (0 sim calls mid-epoch, "
-            "NOTE: may worsen f4 at warm-start positions) | "
-            "both : fast phase first, then full phase"
+            "full : RBCD completo con f4 alle differenze finite | "
+            "fast : solo gradienti analitici (non usa il simulatore durante l'epoca) | "
+            "both : prima la fase veloce, poi quella completa"
         ),
     )
     p.add_argument("--fast-epochs", type=int, default=50,
-                   help="Analytical-only epochs (used in mode=fast or both)")
+                   help="Numero di epoche solo-analitiche (per mode=fast o both)")
     p.add_argument("--full-epochs", type=int, default=20,
-                   help="Full RBCD epochs with f4 FD (used in mode=full or both)")
+                   help="Numero di epoche complete con f4 (per mode=full o both)")
     p.add_argument("--alpha0",  type=float, default=0.01,
-                   help="Initial step size α_0")
+                   help="Passo iniziale alpha_0")
     p.add_argument("--beta",    type=float, default=0.05,
-                   help="Diminishing schedule β")
+                   help="Parametro beta del passo decrescente")
     p.add_argument("--gamma",   type=float, default=0.60,
-                   help="Diminishing schedule γ")
+                   help="Parametro gamma del passo decrescente")
     p.add_argument("--seed",    type=int,   default=42,
-                   help="Random seed")
+                   help="Seme per i numeri casuali")
     p.add_argument("--no-resume", action="store_true",
-                   help="Ignore existing x.txt and restart from warm start")
+                   help="Ignora l'x.txt esistente e riparte dal warm start")
     p.add_argument("--workers", type=int, default=N_WORKERS,
-                   help="Number of parallel threads for f4 perturbations")
+                   help="Numero di thread paralleli per le perturbazioni di f4")
     return p.parse_args()
 
 
@@ -366,9 +363,7 @@ if __name__ == "__main__":
     N_WORKERS = args.workers
 
     if args.mode in ("fast", "both"):
-        print("╔══════════════════════════════════════════╗")
-        print("║  Phase 1 — Analytical RBCD  (FAST)      ║")
-        print("╚══════════════════════════════════════════╝")
+        print("Fase 1: RBCD con soli gradienti analitici (veloce)")
         rbcd(
             n_epochs    = args.fast_epochs,
             alpha_0     = args.alpha0,
@@ -381,9 +376,7 @@ if __name__ == "__main__":
         resume = True   # la fase 2 riparte sempre dal risultato della fase 1
 
     if args.mode in ("full", "both"):
-        print("\n╔══════════════════════════════════════════╗")
-        print("║  Phase 2 — Full RBCD with f4 FD         ║")
-        print("╚══════════════════════════════════════════╝")
+        print("\nFase 2: RBCD completo con il gradiente di f4")
         rbcd(
             n_epochs    = args.full_epochs,
             alpha_0     = args.alpha0 * 0.5,   # passo piu' piccolo dopo la fase iniziale
@@ -394,4 +387,4 @@ if __name__ == "__main__":
             resume      = True,
         )
 
-    print("\nDone.  Best solution in:", OUTPUT)
+    print("\nFinito. La soluzione migliore e' in:", OUTPUT)
