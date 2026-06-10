@@ -1,37 +1,32 @@
 #!/usr/bin/env python3
 """
-Mars Operations: Base Deployment (MOBD) - Optimizer
-Randomized Block Coordinate Descent (RBCD), Gauss-Seidel variant.
+Ottimizzatore per il progetto MOBD (Mars Operations: Base Deployment).
 
-Problem
--------
-Minimise f(x) = f1(x) + f2(x) + f3(x) + f4(x)
-  x ∈ R^{2000}: concatenation of 2-D positions of m=1000 modules.
+Vogliamo minimizzare  f(x) = f1(x) + f2(x) + f3(x) + f4(x),  con x in R^2000
+(le posizioni 2D dei m=1000 moduli messe in fila una dopo l'altra).
 
-  f1 - network dispersion: sum_{i<j} 0.1*(1-exp(-||x^i-x^j||^2))
-  f2 - distance from fixed stations: (1/m)*sum_i sum_q ||x^i-z^q||^2
-  f3 - deviation from ideal operating distance:
-       1000*sum_i (log(1+||x^i-s^i||^2)/log(1+r^2) - 1)^2,  r=100
-  f4 - black-box environmental cost, evaluated via external simulator.
+  f1 - dispersione della rete:  sum_{i<j} 0.1*(1 - exp(-||x^i - x^j||^2))
+  f2 - distanza dalle stazioni fisse:  (1/m)*sum_i sum_q ||x^i - z^q||^2
+  f3 - deviazione dalla distanza operativa ideale:
+       1000*sum_i (log(1+||x^i - s^i||^2)/log(1+r^2) - 1)^2,  r=100
+  f4 - costo ambientale "black-box": non ha formula, lo valutiamo col
+       simulatore esterno fornito col progetto.
 
-Algorithm (RBCD Gauss-Seidel with diminishing step size)
----------------------------------------------------------
-  Initialisation : warm start (f3=0 by construction)
-  Each epoch     : random permutation of module indices, then for each i
-                     g_i = ∂f1/∂x^i + ∂f2/∂x^i + ∂f3/∂x^i + ∂f4/∂x^i
-                     x^i ← x^i − α_k · g_i
-                   α_k = α_0 / (1 + β·k)^γ
-  f4 gradient    : forward finite differences, step H=1e-4.
-                   All 2m=2000 perturbation evaluations per epoch are
-                   dispatched to a thread pool (N_WORKERS threads), so the
-                   total wall time per epoch is ≈ ceil(2m/N_WORKERS)*5 s
-                   instead of 2m*5 s sequential.
-                   "Stale-base" strategy: perturbations all use the
-                   epoch-start snapshot X_snap and f4_base=f4(X_snap) from
-                   the previous epoch-end evaluation, so the base is always
-                   consistent with the perturbed vectors.
-  Checkpointing  : after every epoch, total cost = f_known + f4 is computed;
-                   if it is a new minimum, x.txt is overwritten immediately.
+Per l'ottimizzazione usiamo il metodo RBCD (Randomized Block Coordinate
+Descent) nella variante Gauss-Seidel con passo decrescente:
+  - all'inizio partiamo da un warm start scelto in modo che f3 sia gia' 0;
+  - ad ogni epoca permutiamo a caso i moduli e, per ogni modulo i,
+    aggiorniamo solo il suo blocco:
+        g_i = grad f1 + grad f2 + grad f3 + grad f4   (rispetto a x^i)
+        x^i = x^i - alpha_k * g_i
+    con passo alpha_k = alpha_0 / (1 + beta*k)^gamma;
+  - il gradiente di f4 non lo conosciamo, quindi lo stimiamo con le
+    differenze finite in avanti (passo H=1e-4). Siccome ogni chiamata al
+    simulatore costa diversi secondi, lanciamo le 2000 valutazioni di
+    un'epoca in parallelo su piu' thread. Come punto base usiamo sempre la
+    x di inizio epoca, cosi' resta coerente con tutte le perturbazioni;
+  - alla fine di ogni epoca calcoliamo il costo totale e, se e' il migliore
+    trovato finora, riscriviamo subito x.txt.
 """
 
 import numpy as np
@@ -44,17 +39,17 @@ import tempfile
 import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ── Problem constants ──────────────────────────────────────────────────────────
+# Costanti del problema
 M       = 1000
 R       = 100.0
-H       = 1e-4          # finite-difference step for ∂f4/∂x
+H       = 1e-4          # passo delle differenze finite per il gradiente di f4
 LOG1R2  = np.log(1.0 + R * R)
 
-# Fixed stations z^0 … z^4.  Their sum is (0,0) → grad_f2 = (10/m)*x^i.
+# Stazioni fisse z^0..z^4. La loro somma fa (0,0), quindi grad f2 = (10/m)*x^i.
 STATIONS = np.array([[0., 0.], [100., 100.], [-100., 100.],
                      [-100., -100.], [100., -100.]], dtype=np.float64)
 
-# ── File paths ─────────────────────────────────────────────────────────────────
+# Percorsi dei file
 _DIR = os.path.dirname(os.path.abspath(__file__))
 
 _PLATFORM = platform.system()
@@ -68,20 +63,20 @@ else:
 OUTPUT = os.path.join(_DIR, "x.txt")
 _SHM   = "/dev/shm" if _PLATFORM == "Linux" else tempfile.gettempdir()
 
-N_WORKERS = max(1, os.cpu_count() or 4)   # parallel threads for f4 perturbations
+N_WORKERS = max(1, os.cpu_count() or 4)   # thread paralleli per le perturbazioni di f4
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Simulator interface
-# ══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Interfaccia con il simulatore
+# ---------------------------------------------------------------------------
 
 def _write_x(x_flat: np.ndarray, path: str) -> None:
-    """Write 2000 floats (one per line) to a RAM-disk path."""
+    """Scrive i 2000 valori (uno per riga) nel file che legge il simulatore."""
     np.savetxt(path, x_flat, fmt="%.15g")
 
 
 def eval_f4(x_flat: np.ndarray, path: str) -> float:
-    """Invoke  mobd <path> -b  and return the float value of f4."""
+    """Lancia  mobd <path> -b  e restituisce il valore di f4."""
     _write_x(x_flat, path)
     proc = subprocess.run([SIMULATOR, path, "-b"],
                           capture_output=True, text=True, check=True)
@@ -89,7 +84,7 @@ def eval_f4(x_flat: np.ndarray, path: str) -> float:
 
 
 def _perturb_eval(args: tuple) -> float:
-    """Worker function: perturb x_flat at index idx by +H and eval f4."""
+    """Perturba x_flat nella coordinata idx di +H e valuta f4 (usata dai thread)."""
     x_snap, idx, worker_path = args
     p = x_snap.copy()
     p[idx] += H
@@ -101,17 +96,16 @@ def eval_f4_all_partials(
     f4_base: float,
 ) -> np.ndarray:
     """
-    Compute the f4 partial-gradient estimate for every block simultaneously.
+    Stima il gradiente di f4 per tutti i moduli, con le differenze finite
+    in avanti:
+        df4/dx^i_j ~ (f4(x + H*e_{2i+j}) - f4_base) / H,   j in {0,1}
 
-    Uses forward finite differences:
-        ∂f4/∂x^i_j ≈ (f4(x + H·e_{2i+j}) - f4_base) / H,   j∈{0,1}
+    Le 2*M perturbazioni vengono lanciate su N_WORKERS thread in parallelo,
+    cosi' non aspettiamo una chiamata al simulatore alla volta.
 
-    All 2*M perturbation evaluations are dispatched to N_WORKERS threads so
-    that wall time ≈ ceil(2M / N_WORKERS) × 5 s  instead of  2M × 5 s.
-
-    Returns g_f4 : (m, 2) array of partial gradient estimates.
+    Ritorna g_f4: array (m, 2) con le stime dei gradienti.
     """
-    # Build task list: (x_snap, coord_index, tmp_path)
+    # lista dei task: (x_snap, indice della coordinata, file temporaneo)
     worker_paths = [os.path.join(_SHM, f"mobd_w{k}.txt")
                     for k in range(N_WORKERS)]
     tasks = []
@@ -135,25 +129,25 @@ def eval_f4_all_partials(
     return g_f4
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Analytical cost functions
-# ══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Funzioni di costo (calcolate analiticamente)
+# ---------------------------------------------------------------------------
 
 def compute_f1(X: np.ndarray) -> float:
-    """f1 = 0.1 * sum_{i<j} (1 - exp(-||x^i - x^j||^2))"""
+    """f1 = 0.1 * sum_{i<j} (1 - exp(-||x^i - x^j||^2))."""
     diff = X[:, None, :] - X[None, :, :]          # (m, m, 2)
     sq   = np.einsum("ijk,ijk->ij", diff, diff)    # (m, m)
     return float(0.1 * (M * (M - 1) / 2 - np.triu(np.exp(-sq), k=1).sum()))
 
 
 def compute_f2(X: np.ndarray) -> float:
-    """f2 = (1/m) * sum_i sum_q ||x^i - z^q||^2"""
+    """f2 = (1/m) * sum_i sum_q ||x^i - z^q||^2."""
     diff = X[:, None, :] - STATIONS[None, :, :]   # (m, 5, 2)
     return float(np.einsum("ijk,ijk->", diff, diff) / M)
 
 
 def compute_f3(X: np.ndarray, S: np.ndarray) -> float:
-    """f3 = 1000 * sum_i (log(1+||x^i-s^i||^2)/log(1+r^2) - 1)^2"""
+    """f3 = 1000 * sum_i (log(1+||x^i-s^i||^2)/log(1+r^2) - 1)^2."""
     d2  = np.einsum("ij,ij->i", X - S, X - S)
     phi = np.log1p(d2) / LOG1R2 - 1.0
     return float(1000.0 * phi @ phi)
@@ -163,12 +157,12 @@ def compute_f_known(X: np.ndarray, S: np.ndarray) -> float:
     return compute_f1(X) + compute_f2(X) + compute_f3(X, S)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Analytical partial gradients  (per block i)
-# ══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Gradienti parziali analitici (rispetto al blocco i)
+# ---------------------------------------------------------------------------
 
 def grad_f1_i(i: int, X: np.ndarray) -> np.ndarray:
-    """∂f1/∂x^i = 0.2 * sum_{j≠i} (x^i-x^j) * exp(-||x^i-x^j||^2)"""
+    """Gradiente di f1 su x^i = 0.2 * sum_{j!=i} (x^i-x^j) * exp(-||x^i-x^j||^2)."""
     d  = X[i] - X
     sq = np.einsum("ij,ij->i", d, d)
     w  = np.exp(-sq)
@@ -177,29 +171,29 @@ def grad_f1_i(i: int, X: np.ndarray) -> np.ndarray:
 
 
 def grad_f2_i(i: int, X: np.ndarray) -> np.ndarray:
-    """∂f2/∂x^i = (10/m)*x^i   (uses sum_q z^q = 0)"""
+    """Gradiente di f2 su x^i = (10/m)*x^i  (sfrutta il fatto che sum_q z^q = 0)."""
     return (10.0 / M) * X[i]
 
 
 def grad_f3_i(i: int, X: np.ndarray, S: np.ndarray) -> np.ndarray:
-    """∂f3/∂x^i = 4000*phi_i*(x^i-s^i) / ((1+D_i)*log(1+r^2))"""
+    """Gradiente di f3 su x^i = 4000*phi_i*(x^i-s^i) / ((1+D_i)*log(1+r^2))."""
     d   = X[i] - S[i]
     D   = float(d @ d)
     phi = np.log1p(D) / LOG1R2 - 1.0
     return (4000.0 * phi / ((1.0 + D) * LOG1R2)) * d
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Warm start  (f3 = 0 exactly at initialisation)
-# ══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Warm start (cosi' all'inizio f3 vale esattamente 0)
+# ---------------------------------------------------------------------------
 
 def warm_start() -> tuple:
     """
-    Reference points: s^i = ((-1)^i * i * 0.2,  (-1)^i * i * 0.2), i=1…m.
+    Punti di riferimento: s^i = ((-1)^i * i * 0.2, (-1)^i * i * 0.2), i=1..m.
 
-    Place each module at distance r from s^i oriented toward the origin:
-        x^i = s^i + r * (−s^i / ‖s^i‖)
-    This satisfies ‖x^i − s^i‖ = r  ⟹  phi_i = 0  ⟹  f3 = 0.
+    Mettiamo ogni modulo a distanza r da s^i, in direzione dell'origine:
+        x^i = s^i + r * (-s^i / ||s^i||)
+    In questo modo ||x^i - s^i|| = r, quindi phi_i = 0 e di conseguenza f3 = 0.
     """
     idx  = np.arange(1, M + 1, dtype=np.float64)
     sign = np.where(idx % 2 == 0, 1.0, -1.0)
@@ -211,9 +205,9 @@ def warm_start() -> tuple:
     return X, S
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# RBCD optimiser
-# ══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Ottimizzatore RBCD
+# ---------------------------------------------------------------------------
 
 def rbcd(
     n_epochs:    int   = 20,
@@ -227,19 +221,20 @@ def rbcd(
     """
     Randomized Block Coordinate Descent.
 
-    Parameters
-    ----------
-    n_epochs    : number of full sweeps over all m=1000 modules
-    alpha_0     : initial step size
-    beta, gamma : diminishing schedule  α_k = α_0 / (1 + β·k)^γ
-    use_f4_grad : True  → spec-compliant; forward-FD for f4, parallelised
-                  False → analytical gradient only (fast diagnostic mode,
-                          beware: may worsen f4 at post-warm-start positions)
-    resume      : load existing x.txt as starting point if valid
+    Parametri
+    ---------
+    n_epochs    : quante passate complete fare su tutti gli m=1000 moduli
+    alpha_0     : passo iniziale
+    beta, gamma : passo decrescente  alpha_k = alpha_0 / (1 + beta*k)^gamma
+    use_f4_grad : True  -> include il gradiente di f4 con le differenze finite
+                           (parallelizzate); e' la modalita' completa
+                  False -> usa solo i gradienti analitici (modalita' veloce
+                           per fare prove; attenzione: puo' peggiorare f4)
+    resume      : se trova un x.txt valido riparte da quello
     """
     rng = np.random.default_rng(seed)
 
-    # ── Initialise ─────────────────────────────────────────────────────────
+    # inizializzazione
     X, S = warm_start()
     print("Warm start computed  (f3 = 0 by construction)")
 
@@ -252,10 +247,10 @@ def rbcd(
         except Exception as exc:
             print(f"Could not load {OUTPUT}: {exc}")
 
-    # Always save a valid warm-start checkpoint immediately
+    # salviamo subito un x.txt valido (almeno il warm start)
     np.savetxt(OUTPUT, X.flatten(), fmt="%.15g")
 
-    # ── Initial evaluation ─────────────────────────────────────────────────
+    # valutazione iniziale
     t0     = time.time()
     tmp0   = os.path.join(_SHM, "mobd_init.txt")
     f4_now = eval_f4(X.flatten(), tmp0)
@@ -281,17 +276,17 @@ def rbcd(
         alpha = alpha_0 / (1.0 + beta * ep) ** gamma
         order = rng.permutation(M)
 
-        # ── Compute f4 gradient cache for this epoch (parallelised) ────────
+        # gradiente di f4 per questa epoca (calcolato una volta, in parallelo)
         if use_f4_grad:
-            snap    = X.flatten()   # epoch-start snapshot (consistent base)
-            f4_base = f4_now        # f4(snap) from previous epoch-end eval
+            snap    = X.flatten()   # x di inizio epoca, usata come base comune
+            f4_base = f4_now        # f4(snap), gia' calcolata a fine epoca precedente
             t_fd    = time.time()
             g_f4    = eval_f4_all_partials(snap, f4_base)
             print(f"  [f4 FD done in {time.time()-t_fd:.1f}s]", flush=True)
         else:
             g_f4 = np.zeros((M, 2), dtype=np.float64)
 
-        # ── Gauss-Seidel block updates ──────────────────────────────────────
+        # aggiornamento dei blocchi (Gauss-Seidel, un modulo alla volta)
         for i in order:
             g = (grad_f1_i(i, X)
                  + grad_f2_i(i, X)
@@ -299,7 +294,7 @@ def rbcd(
                  + g_f4[i])
             X[i] -= alpha * g
 
-        # ── Epoch-end: evaluate total cost and checkpoint ───────────────────
+        # fine epoca: calcoliamo il costo totale e salviamo se migliora
         tmp_ep = os.path.join(_SHM, "mobd_epoch.txt")
         f4_now = eval_f4(X.flatten(), tmp_ep)
         fk     = compute_f_known(X, S)
@@ -322,9 +317,9 @@ def rbcd(
     return best_X
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Entry point
-# ══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# Avvio del programma
+# ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -365,7 +360,7 @@ if __name__ == "__main__":
     args   = parse_args()
     resume = not args.no_resume
 
-    # Override global worker count if specified
+    # aggiorna il numero di thread se passato da riga di comando
     import mobd_optimizer as _self
     _self.N_WORKERS = args.workers
     N_WORKERS = args.workers
@@ -383,7 +378,7 @@ if __name__ == "__main__":
             use_f4_grad = False,
             resume      = resume,
         )
-        resume = True   # phase 2 always resumes from phase 1 output
+        resume = True   # la fase 2 riparte sempre dal risultato della fase 1
 
     if args.mode in ("full", "both"):
         print("\n╔══════════════════════════════════════════╗")
@@ -391,7 +386,7 @@ if __name__ == "__main__":
         print("╚══════════════════════════════════════════╝")
         rbcd(
             n_epochs    = args.full_epochs,
-            alpha_0     = args.alpha0 * 0.5,   # smaller α after warm-up
+            alpha_0     = args.alpha0 * 0.5,   # passo piu' piccolo dopo la fase iniziale
             beta        = args.beta,
             gamma       = args.gamma,
             seed        = args.seed + 1,
