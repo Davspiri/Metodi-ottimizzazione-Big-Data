@@ -45,7 +45,7 @@ R       = 100.0
 H       = 1e-4          # passo delle differenze finite per il gradiente di f4
 LOG1R2  = np.log(1.0 + R * R)
 
-# Stazioni fisse z^0..z^4. La loro somma fa (0,0), quindi grad f2 = (10/m)*x^i.
+# grad f2 = (10/m)*x^i.
 STATIONS = np.array([[0., 0.], [100., 100.], [-100., 100.],
                      [-100., -100.], [100., -100.]], dtype=np.float64)
 
@@ -66,10 +66,7 @@ _SHM   = "/dev/shm" if _PLATFORM == "Linux" else tempfile.gettempdir()
 N_WORKERS = max(1, os.cpu_count() or 4)   # thread paralleli per le perturbazioni di f4
 
 
-# ---------------------------------------------------------------------------
-# Interfaccia con il simulatore
-# ---------------------------------------------------------------------------
-
+# Interfaccia con il simulatore. 
 def _write_x(x_flat: np.ndarray, path: str) -> None:
     """Scrive i 2000 valori (uno per riga) nel file che legge il simulatore."""
     np.savetxt(path, x_flat, fmt="%.15g")
@@ -129,9 +126,8 @@ def eval_f4_all_partials(
     return g_f4
 
 
-# ---------------------------------------------------------------------------
-# Funzioni di costo (calcolate analiticamente)
-# ---------------------------------------------------------------------------
+
+# Funzioni di costo (calcolate analiticamente). 
 
 def compute_f1(X: np.ndarray) -> float:
     """f1 = 0.1 * sum_{i<j} (1 - exp(-||x^i - x^j||^2))."""
@@ -157,9 +153,8 @@ def compute_f_known(X: np.ndarray, S: np.ndarray) -> float:
     return compute_f1(X) + compute_f2(X) + compute_f3(X, S)
 
 
-# ---------------------------------------------------------------------------
-# Gradienti parziali analitici (rispetto al blocco i)
-# ---------------------------------------------------------------------------
+
+# Gradienti parziali analitici (rispetto al blocco i). 
 
 def grad_f1_i(i: int, X: np.ndarray) -> np.ndarray:
     """Gradiente di f1 su x^i = 0.2 * sum_{j!=i} (x^i-x^j) * exp(-||x^i-x^j||^2)."""
@@ -183,9 +178,7 @@ def grad_f3_i(i: int, X: np.ndarray, S: np.ndarray) -> np.ndarray:
     return (4000.0 * phi / ((1.0 + D) * LOG1R2)) * d
 
 
-# ---------------------------------------------------------------------------
-# Warm start (cosi' all'inizio f3 vale esattamente 0)
-# ---------------------------------------------------------------------------
+# Warm start (cosi' all'inizio f3 vale esattamente 0)    
 
 def warm_start() -> tuple:
     """
@@ -205,9 +198,8 @@ def warm_start() -> tuple:
     return X, S
 
 
-# ---------------------------------------------------------------------------
-# Ottimizzatore RBCD
-# ---------------------------------------------------------------------------
+# Ottimizzatore RBCD. 
+
 
 def rbcd(
     n_epochs:    int   = 20,
@@ -314,11 +306,7 @@ def rbcd(
 
     return best_X
 
-
-# ---------------------------------------------------------------------------
-# Avvio del programma
-# ---------------------------------------------------------------------------
-
+# Avvio del programma. 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Ottimizzatore RBCD per il progetto MOBD",
@@ -373,7 +361,7 @@ if __name__ == "__main__":
             use_f4_grad = False,
             resume      = resume,
         )
-        resume = True   # la fase 2 riparte sempre dal risultato della fase 1
+        resume = True   #la fase 2 riparte sempre dal risultato della fase 1
 
     if args.mode in ("full", "both"):
         print("\nFase 2: RBCD completo con il gradiente di f4")
