@@ -13,10 +13,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 M       = 1000
 R       = 100.0
 H       = 1e-4          # passo delle differenze finite per il gradiente di f4
-LOG1R2  = np.log(1.0 + R * R)
+LOG1R2  = np.log(1.0 + R * R) # costante usata in f3 e grad f3
 
-# grad f2 = (10/m)*x^i.
-STATIONS = np.array([[0., 0.], [100., 100.], [-100., 100.],
+
+STATIONS = np.array([[0., 0.], [100., 100.], [-100., 100.], # punti di riferimento z^q
                      [-100., -100.], [100., -100.]], dtype=np.float64)
 
 # Percorsi dei file
@@ -52,7 +52,7 @@ def eval_f4(x_flat: np.ndarray, path: str) -> float:
 
 
 def _perturb_eval(args: tuple) -> float:
-    # Perturba x_flat nella coordinata idx di +H e valuta f4 (usata dai thread). 
+    # Valuta f4(x + H*e_idx) per stimare la derivata parziale rispetto alla coordinata idx.
     x_snap, idx, worker_path = args
     p = x_snap.copy()
     p[idx] += H
@@ -71,11 +71,11 @@ def eval_f4_all_partials(
 #    Le 2*M perturbazioni vengono lanciate su N_WORKERS thread in parallelo,
 #    cosi' non aspettiamo una chiamata al simulatore alla volta.
 #
-#    Ritorna g_f4: array (m, 2) con le stime dei gradienti.
+#    Ritorna g_f4: array (m, 2) con le stime dei gradienti
 
     # lista dei task: (x_snap, indice della coordinata, file temporaneo)
     worker_paths = [os.path.join(_SHM, f"mobd_w{k}.txt")
-                    for k in range(N_WORKERS)]
+                    for k in range(N_WORKERS)] # ogni worker scrive su un file distinto per evitare conflitti tra thread
     tasks = []
     for i in range(M):
         tasks.append((x_snap, 2 * i,     worker_paths[(2 * i)     % N_WORKERS]))
@@ -104,6 +104,7 @@ def compute_f1(X: np.ndarray) -> float:
     # f1 = 0.1 * sum_{i<j} (1 - exp(-||x^i - x^j||^2)). 
     diff = X[:, None, :] - X[None, :, :]          # (m, m, 2)
     sq   = np.einsum("ijk,ijk->ij", diff, diff)    # (m, m)
+    # np.triu(..., k=1) conta ogni coppia (i,j) una sola volta (triangolo superiore, i<j)
     return float(0.1 * (M * (M - 1) / 2 - np.triu(np.exp(-sq), k=1).sum()))
 
 
@@ -116,7 +117,7 @@ def compute_f2(X: np.ndarray) -> float:
 def compute_f3(X: np.ndarray, S: np.ndarray) -> float:
     # f3 = 1000 * sum_i (log(1+||x^i-s^i||^2)/log(1+r^2) - 1)^2.
     d2  = np.einsum("ij,ij->i", X - S, X - S)
-    phi = np.log1p(d2) / LOG1R2 - 1.0
+    phi = np.log1p(d2) / LOG1R2 - 1.0 #phi_i = 0 quando ||x^i - s^i|| = R (distanza target)
     return float(1000.0 * phi @ phi)
 
 
@@ -132,12 +133,12 @@ def grad_f1_i(i: int, X: np.ndarray) -> np.ndarray:
     d  = X[i] - X
     sq = np.einsum("ij,ij->i", d, d)
     w  = np.exp(-sq)
-    w[i] = 0.0
+    w[i] = 0.0 # w[i] = 0: esclude il termine j=i (auto-interazione nulla)
     return 0.2 * (w[:, None] * d).sum(axis=0)
 
 
 def grad_f2_i(i: int, X: np.ndarray) -> np.ndarray:
-    # Gradiente di f2 su x^i = (10/m)*x^i  (sfrutta il fatto che sum_q z^q = 0).
+   # grad f2 = (10/m)*x^i  (la somma delle stazioni sum_q z^q = 0, quindi si cancella)
     return (10.0 / M) * X[i]
 
 
@@ -165,7 +166,7 @@ def warm_start() -> tuple:
     nrm  = np.linalg.norm(S, axis=1, keepdims=True)               # (m, 1)
     safe = np.where(nrm < 1e-12, 1.0, nrm)
     X    = S + R * (-S / safe)
-    X[nrm[:, 0] < 1e-12] = [R, 0.0]
+    X[nrm[:, 0] < 1e-12] = [R, 0.0] # se s^i è nell'origine, la direzione non è definita e poniamo x^i = (R, 0) per default
     return X, S
 
 
@@ -235,7 +236,7 @@ def rbcd(
     for ep in range(n_epochs):
         t_ep  = time.time()
         alpha = alpha_0 / (1.0 + beta * ep) ** gamma
-        order = rng.permutation(M)
+        order = rng.permutation(M)  # ordine casuale a ogni epoca: evita bias ciclici (il "Randomized" di RBCD)
 
         # gradiente di f4 per questa epoca (calcolato una volta, in parallelo)
         if use_f4_grad:
@@ -243,6 +244,7 @@ def rbcd(
             f4_base = f4_now        # f4(snap), gia' calcolata a fine epoca precedente
             t_fd    = time.time()
             g_f4    = eval_f4_all_partials(snap, f4_base)
+            # g_f4[i] è calcolato sul punto di inizio epoca (approssimazione Gauss-Seidel per f4).
             print(f"  [gradiente di f4 calcolato in {time.time()-t_fd:.1f}s]", flush=True)
         else:
             g_f4 = np.zeros((M, 2), dtype=np.float64)
